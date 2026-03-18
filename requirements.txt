@@ -1,2 +1,3 @@
 edge-tts
-pygame
+discord.py[voice]
+python-dotenv
