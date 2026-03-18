@@ -44,9 +44,9 @@ async def tts_worker(guild_id: int):
             queue.task_done()
 
 
-@tree.command(name="invest", description="加入你的語音頻道並監聽指定文字頻道的訊息")
+@tree.command(name="invite", description="加入你的語音頻道並監聽指定文字頻道的訊息")
 @app_commands.describe(channel="要監聽的文字頻道")
-async def invest(interaction: discord.Interaction, channel: discord.TextChannel):
+async def invite(interaction: discord.Interaction, channel: discord.TextChannel):
     if not interaction.user.voice or not interaction.user.voice.channel:
         await interaction.response.send_message("❌ 你必須先加入一個語音頻道！", ephemeral=True)
         return
