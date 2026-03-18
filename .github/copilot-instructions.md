@@ -26,3 +26,8 @@ python tts.py
 - All user-facing strings are in Traditional Chinese (繁體中文).
 - Async-first: use `asyncio` for all I/O-bound operations.
 - Temp files are created for audio playback and cleaned up in `finally` blocks.
+
+## Git Workflow
+
+- 每次異動完成後都要 commit。
+- Commit message 必須使用中文撰寫。
