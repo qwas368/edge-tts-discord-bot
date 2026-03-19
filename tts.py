@@ -1,7 +1,7 @@
 import tempfile
 import edge_tts
 
-VOICE = "zh-CN-XiaoyiNeural"
+VOICE = "zh-CN-YunxiNeural"
 RATE = "+20%"
 
 
