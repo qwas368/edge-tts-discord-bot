@@ -5,6 +5,8 @@ from discord import app_commands
 from dotenv import load_dotenv
 from tts import generate_tts
 
+CHUNK_THRESHOLD = 100
+
 load_dotenv()
 
 intents = discord.Intents.default()
@@ -15,6 +17,26 @@ tree = app_commands.CommandTree(client)
 
 # 每個 guild 的狀態：監聽的文字頻道 ID 與語音播放佇列
 guild_state: dict[int, dict] = {}
+
+
+def split_text(text: str, threshold: int = CHUNK_THRESHOLD) -> list[str]:
+    """每累積 threshold 字後，在下一個換行處截斷。"""
+    lines = text.split("\n")
+    chunks: list[str] = []
+    current: list[str] = []
+    length = 0
+
+    for line in lines:
+        current.append(line)
+        length += len(line)
+        if length >= threshold:
+            chunks.append("\n".join(current))
+            current = []
+            length = 0
+
+    if current:
+        chunks.append("\n".join(current))
+    return chunks
 
 
 async def tts_worker(guild_id: int):
@@ -93,8 +115,15 @@ async def leave(interaction: discord.Interaction):
     if state["voice_client"].is_connected():
         await state["voice_client"].disconnect()
 
-    # 取消 worker 並清理狀態
+    # 取消 worker、清空佇列並清理狀態
     state["worker"].cancel()
+    queue = state["queue"]
+    while not queue.empty():
+        try:
+            queue.get_nowait()
+            queue.task_done()
+        except asyncio.QueueEmpty:
+            break
     del guild_state[guild_id]
 
     await interaction.response.send_message("👋 已離開語音頻道並停止監聽", ephemeral=True)
@@ -126,7 +155,8 @@ async def on_message(message: discord.Message):
 
     text = message.clean_content.strip()
     if text:
-        await state["queue"].put(text)
+        for chunk in split_text(text):
+            await state["queue"].put(chunk)
 
 
 client.run(os.getenv("DISCORD_TOKEN"))
