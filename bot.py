@@ -43,7 +43,7 @@ def split_text(text: str, threshold: int = CHUNK_THRESHOLD) -> list[str]:
 
 
 async def tts_worker(guild_id: int):
-    """從佇列中取出訊息，依序轉語音並在語音頻道播放。"""
+    """從佇列中取出訊息，依序轉語音並在語音頻道播放。播放時預先產生下一段音檔。"""
     state = guild_state[guild_id]
     queue: asyncio.Queue = state["queue"]
 
@@ -56,17 +56,32 @@ async def tts_worker(guild_id: int):
                 continue
 
             mp3_path = await generate_tts(text)
-            try:
-                source = discord.FFmpegPCMAudio(mp3_path)
-                finished = asyncio.Event()
-                voice_client.play(source, after=lambda e: finished.set())
-                await finished.wait()
-            finally:
-                os.unlink(mp3_path)
+
+            # 內層迴圈：播放當前音檔，同時預取下一段以減少中斷
+            while True:
+                prefetch_task = None
+                try:
+                    next_text = queue.get_nowait()
+                    prefetch_task = asyncio.create_task(generate_tts(next_text))
+                except asyncio.QueueEmpty:
+                    pass
+
+                try:
+                    source = discord.FFmpegPCMAudio(mp3_path)
+                    finished = asyncio.Event()
+                    voice_client.play(source, after=lambda e: finished.set())
+                    await finished.wait()
+                finally:
+                    os.unlink(mp3_path)
+
+                queue.task_done()
+
+                if prefetch_task is not None:
+                    mp3_path = await prefetch_task
+                else:
+                    break
         except Exception as e:
             print(f"[TTS Worker 錯誤] {e}")
-        finally:
-            queue.task_done()
 
 
 @tree.command(name="invite", description="加入你的語音頻道並監聽指定文字頻道的訊息")
