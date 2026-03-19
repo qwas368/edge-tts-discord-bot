@@ -1,11 +1,14 @@
 import asyncio
 import os
+import re
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
 from tts import generate_tts
 
 CHUNK_THRESHOLD = 100
+# 會被 TTS 唸出但無語意的符號
+STRIP_CHARS_RE = re.compile(r"[*#_~`|>\\]")
 
 load_dotenv()
 
@@ -153,7 +156,7 @@ async def on_message(message: discord.Message):
     if message.channel.id != state["monitor_channel_id"]:
         return
 
-    text = message.clean_content.strip()
+    text = STRIP_CHARS_RE.sub("", message.clean_content).strip()
     if text:
         for chunk in split_text(text):
             await state["queue"].put(chunk)
