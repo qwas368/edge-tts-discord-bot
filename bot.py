@@ -43,10 +43,9 @@ def split_text(text: str, threshold: int = CHUNK_THRESHOLD) -> list[str]:
 
 
 async def tts_worker(guild_id: int):
-    """從佇列中取出訊息，依序轉語音並在語音頻道播放。預先產生下一段音檔以減少中斷。"""
+    """從佇列中取出訊息，依序轉語音並在語音頻道播放。"""
     state = guild_state[guild_id]
     queue: asyncio.Queue = state["queue"]
-    next_task: asyncio.Task | None = None
 
     while True:
         text = await queue.get()
@@ -56,22 +55,7 @@ async def tts_worker(guild_id: int):
                 queue.task_done()
                 continue
 
-            # 若已有預先產生的音檔就直接使用，否則現場產生
-            if next_task is not None:
-                mp3_path = await next_task
-                next_task = None
-            else:
-                mp3_path = await generate_tts(text)
-
-            # 播放前先預取下一段
-            try:
-                next_text = queue.get_nowait()
-            except asyncio.QueueEmpty:
-                next_text = None
-
-            if next_text is not None:
-                next_task = asyncio.create_task(generate_tts(next_text))
-
+            mp3_path = await generate_tts(text)
             try:
                 source = discord.FFmpegPCMAudio(mp3_path)
                 finished = asyncio.Event()
@@ -79,15 +63,8 @@ async def tts_worker(guild_id: int):
                 await finished.wait()
             finally:
                 os.unlink(mp3_path)
-
-            if next_text is not None:
-                queue.task_done()
         except Exception as e:
             print(f"[TTS Worker 錯誤] {e}")
-            # 預取失敗時清理
-            if next_task is not None:
-                next_task.cancel()
-                next_task = None
         finally:
             queue.task_done()
 
