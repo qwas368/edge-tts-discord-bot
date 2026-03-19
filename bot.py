@@ -6,7 +6,8 @@ from discord import app_commands
 from dotenv import load_dotenv
 from tts import generate_tts
 
-CHUNK_THRESHOLD = 100
+FIRST_CHUNK_THRESHOLD = 100
+CHUNK_THRESHOLD = 400
 # 會被 TTS 唸出但無語意的符號
 STRIP_CHARS_RE = re.compile(r"[*#_~`|>\\]")
 
@@ -22,12 +23,13 @@ tree = app_commands.CommandTree(client)
 guild_state: dict[int, dict] = {}
 
 
-def split_text(text: str, threshold: int = CHUNK_THRESHOLD) -> list[str]:
-    """每累積 threshold 字後，在下一個換行處截斷。"""
+def split_text(text: str) -> list[str]:
+    """第一段 100 字後截斷，之後每 400 字截斷。"""
     lines = text.split("\n")
     chunks: list[str] = []
     current: list[str] = []
     length = 0
+    threshold = FIRST_CHUNK_THRESHOLD
 
     for line in lines:
         current.append(line)
@@ -36,6 +38,7 @@ def split_text(text: str, threshold: int = CHUNK_THRESHOLD) -> list[str]:
             chunks.append("\n".join(current))
             current = []
             length = 0
+            threshold = CHUNK_THRESHOLD
 
     if current:
         chunks.append("\n".join(current))
