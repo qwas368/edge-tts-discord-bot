@@ -183,8 +183,8 @@ async def on_ready():
 
 @client.event
 async def on_message(message: discord.Message):
-    # 忽略 bot 自己的訊息
-    if message.author.bot:
+    # 忽略自己的訊息
+    if message.author.id == client.user.id:
         return
 
     guild_id = message.guild.id if message.guild else None
