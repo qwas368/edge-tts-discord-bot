@@ -4,12 +4,29 @@ import re
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
-from tts import generate_tts
+from tts import generate_tts, VOICE
 
 FIRST_CHUNK_THRESHOLD = 100
 CHUNK_THRESHOLD = 400
 # 會被 TTS 唸出但無語意的符號
 STRIP_CHARS_RE = re.compile(r"[*#_~`|>\\]")
+
+CHINESE_VOICES = [
+    app_commands.Choice(name="YunxiaNeural (預設)", value="zh-CN-YunxiaNeural"),
+    app_commands.Choice(name="XiaoxiaoNeural", value="zh-CN-XiaoxiaoNeural"),
+    app_commands.Choice(name="XiaoyiNeural", value="zh-CN-XiaoyiNeural"),
+    app_commands.Choice(name="YunjianNeural", value="zh-CN-YunjianNeural"),
+    app_commands.Choice(name="YunxiNeural", value="zh-CN-YunxiNeural"),
+    app_commands.Choice(name="YunyangNeural", value="zh-CN-YunyangNeural"),
+    app_commands.Choice(name="遼寧 XiaobeiNeural", value="zh-CN-liaoning-XiaobeiNeural"),
+    app_commands.Choice(name="陝西 XiaoniNeural", value="zh-CN-shaanxi-XiaoniNeural"),
+    app_commands.Choice(name="粵語 HiuGaaiNeural", value="zh-HK-HiuGaaiNeural"),
+    app_commands.Choice(name="粵語 HiuMaanNeural", value="zh-HK-HiuMaanNeural"),
+    app_commands.Choice(name="粵語 WanLungNeural", value="zh-HK-WanLungNeural"),
+    app_commands.Choice(name="台灣 HsiaoChenNeural", value="zh-TW-HsiaoChenNeural"),
+    app_commands.Choice(name="台灣 HsiaoYuNeural", value="zh-TW-HsiaoYuNeural"),
+    app_commands.Choice(name="台灣 YunJheNeural", value="zh-TW-YunJheNeural"),
+]
 
 load_dotenv()
 
@@ -58,14 +75,15 @@ async def tts_worker(guild_id: int):
                 queue.task_done()
                 continue
 
-            mp3_path = await generate_tts(text)
+            voice = state.get("voice", VOICE)
+            mp3_path = await generate_tts(text, voice=voice)
 
             # 內層迴圈：播放當前音檔，同時預取下一段以減少中斷
             while True:
                 prefetch_task = None
                 try:
                     next_text = queue.get_nowait()
-                    prefetch_task = asyncio.create_task(generate_tts(next_text))
+                    prefetch_task = asyncio.create_task(generate_tts(next_text, voice=voice))
                 except asyncio.QueueEmpty:
                     pass
 
@@ -88,8 +106,10 @@ async def tts_worker(guild_id: int):
 
 
 @tree.command(name="invite", description="加入你的語音頻道並監聽指定文字頻道的訊息")
-@app_commands.describe(channel="要監聽的文字頻道")
-async def invite(interaction: discord.Interaction, channel: discord.TextChannel):
+@app_commands.describe(channel="要監聽的文字頻道", voice="TTS 語音（預設：YunxiaNeural）")
+@app_commands.choices(voice=CHINESE_VOICES)
+async def invite(interaction: discord.Interaction, channel: discord.TextChannel, voice: app_commands.Choice[str] = None):
+    selected_voice = voice.value if voice else VOICE
     if not interaction.user.voice or not interaction.user.voice.channel:
         await interaction.response.send_message("❌ 你必須先加入一個語音頻道！", ephemeral=True)
         return
@@ -111,15 +131,17 @@ async def invite(interaction: discord.Interaction, channel: discord.TextChannel)
         guild_state[guild_id] = {
             "voice_client": voice_client,
             "monitor_channel_id": channel.id,
+            "voice": selected_voice,
             "queue": queue,
             "worker": asyncio.create_task(tts_worker(guild_id)),
         }
     else:
         guild_state[guild_id]["voice_client"] = voice_client
         guild_state[guild_id]["monitor_channel_id"] = channel.id
+        guild_state[guild_id]["voice"] = selected_voice
 
     await interaction.response.send_message(
-        f"✅ 已加入 **{voice_channel.name}**，開始監聽 {channel.mention} 的訊息",
+        f"✅ 已加入 **{voice_channel.name}**，開始監聽 {channel.mention} 的訊息（語音：`{selected_voice}`）",
         ephemeral=True,
     )
 
