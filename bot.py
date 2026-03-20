@@ -114,6 +114,8 @@ async def invite(interaction: discord.Interaction, channel: discord.TextChannel,
         await interaction.response.send_message("❌ 你必須先加入一個語音頻道！", ephemeral=True)
         return
 
+    await interaction.response.defer(ephemeral=True)
+
     voice_channel = interaction.user.voice.channel
     guild_id = interaction.guild_id
 
@@ -140,9 +142,8 @@ async def invite(interaction: discord.Interaction, channel: discord.TextChannel,
         guild_state[guild_id]["monitor_channel_id"] = channel.id
         guild_state[guild_id]["voice"] = selected_voice
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✅ 已加入 **{voice_channel.name}**，開始監聽 {channel.mention} 的訊息（語音：`{selected_voice}`）",
-        ephemeral=True,
     )
 
 
@@ -154,6 +155,8 @@ async def leave(interaction: discord.Interaction):
     if not state or not state.get("voice_client"):
         await interaction.response.send_message("❌ 我目前沒有在任何語音頻道中", ephemeral=True)
         return
+
+    await interaction.response.defer(ephemeral=True)
 
     if state["voice_client"].is_connected():
         await state["voice_client"].disconnect()
@@ -169,7 +172,7 @@ async def leave(interaction: discord.Interaction):
             break
     del guild_state[guild_id]
 
-    await interaction.response.send_message("👋 已離開語音頻道並停止監聽", ephemeral=True)
+    await interaction.followup.send("👋 已離開語音頻道並停止監聽")
 
 
 @client.event
