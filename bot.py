@@ -109,7 +109,6 @@ async def tts_worker(guild_id: int):
 @app_commands.describe(channel="要監聽的文字頻道", voice="TTS 語音（預設：YunxiaNeural）")
 @app_commands.choices(voice=CHINESE_VOICES)
 async def invite(interaction: discord.Interaction, channel: discord.TextChannel, voice: app_commands.Choice[str] = None):
-    selected_voice = voice.value if voice else VOICE
     if not interaction.user.voice or not interaction.user.voice.channel:
         await interaction.response.send_message("❌ 你必須先加入一個語音頻道！", ephemeral=True)
         return
@@ -118,6 +117,14 @@ async def invite(interaction: discord.Interaction, channel: discord.TextChannel,
 
     voice_channel = interaction.user.voice.channel
     guild_id = interaction.guild_id
+
+    # 未指定語音時，沿用先前設定；都沒有則用預設值
+    if voice:
+        selected_voice = voice.value
+    elif guild_id in guild_state:
+        selected_voice = guild_state[guild_id].get("voice", VOICE)
+    else:
+        selected_voice = VOICE
 
     # 如果已在語音頻道，先斷開
     if guild_id in guild_state and guild_state[guild_id].get("voice_client"):
